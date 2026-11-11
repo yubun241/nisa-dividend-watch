@@ -1,0 +1,10 @@
+# 個人のデータ（公開しない）
+watchlist.json
+cache.pkl
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc

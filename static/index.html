@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NISA 配当ウォッチ</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f1; --surface: #fcfcfb; --surface-2: #efeeea; --border: #dddcd5;
+  --text: #0b0b0b; --text-2: #52514e; --text-3: #85847d;
+  --up: #d43a39; --down: #00770a;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --good-bg: #dff3e3; --good-fg: #0a5c18; --mild-bg: #e4eefb; --mild-fg: #1a4f94;
+  --hot-bg: #fbe6d9; --hot-fg: #9a3d10; --neutral-bg: #ebeae5; --neutral-fg: #52514e;
+  --warn: #b26a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --surface-2: #242422; --border: #353532;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #8b8a82;
+    --up: #f07372; --down: #4cba58;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --good-bg: #153a1d; --good-fg: #8fdc9c; --mild-bg: #172f50; --mild-fg: #9cc4f5;
+    --hot-bg: #4a2410; --hot-fg: #f3b08c; --neutral-bg: #2a2a28; --neutral-fg: #c3c2b7;
+    --warn: #e0a030;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; }
+header { padding: 18px 24px 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font-size: 20px; margin: 0; }
+.sub { color: var(--text-2); font-size: 13px; }
+main { padding: 0 24px 40px; }
+.num { font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); } .muted { color: var(--text-3); }
+button, input, select { font: inherit; color: inherit; }
+button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+button:hover { background: var(--surface-2); }
+button.primary { background: var(--s1); border-color: var(--s1); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input, select { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 8px 0 14px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+.tile .k { color: var(--text-2); font-size: 12px; }
+.tile .v { font-size: 22px; font-weight: 600; }
+.tile .n { color: var(--text-3); font-size: 12px; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 10px; }
+.toolbar label { color: var(--text-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.toolbar .spacer { flex: 1; }
+#msg { color: var(--warn); font-size: 13px; min-height: 1.4em; margin-bottom: 4px; }
+
+.tablewrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: auto; max-height: calc(100vh - 150px); }
+table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+th { position: sticky; top: 0; background: var(--surface-2); font-weight: 600; font-size: 12px; color: var(--text-2); cursor: pointer; user-select: none; z-index: 2; }
+th:hover { color: var(--text); }
+th.sorted { color: var(--text); }
+th.l, td.l { text-align: left; }
+td.c, th.c { text-align: center; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+td.name small { display: block; color: var(--text-3); font-size: 11px; }
+.yield { font-weight: 700; font-size: 15px; }
+.badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+.lv2 { background: var(--good-bg); color: var(--good-fg); }
+.lv1 { background: var(--mild-bg); color: var(--mild-fg); }
+.lv0 { background: var(--neutral-bg); color: var(--neutral-fg); }
+.lv-1 { background: var(--hot-bg); color: var(--hot-fg); }
+.warnmark { color: var(--warn); cursor: help; }
+.meter { display: inline-block; width: 70px; height: 6px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--border); position: relative; vertical-align: middle; margin-right: 6px; }
+.meter i { position: absolute; top: -3px; width: 4px; height: 10px; border-radius: 2px; background: var(--text); transform: translateX(-2px); }
+.del { border: 0; background: none; color: var(--text-3); padding: 2px 6px; }
+.del:hover { color: var(--up); background: none; }
+.spark { vertical-align: middle; }
+.loading { padding: 60px; text-align: center; color: var(--text-2); }
+
+dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); width: min(1080px, 94vw); max-height: 92vh; padding: 0; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dhead { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 6px; position: sticky; top: 0; background: var(--surface); z-index: 3; }
+.dhead h2 { margin: 0; font-size: 19px; }
+.dhead .price { font-size: 24px; font-weight: 700; }
+.dbody { padding: 4px 22px 22px; }
+.dbody h3 { font-size: 14px; margin: 20px 0 6px; }
+.why { margin: 6px 0 0; padding: 0; list-style: none; }
+.why li { padding: 2px 0; }
+.why .plus { color: var(--good-fg); } .why .minus { color: var(--hot-fg); }
+.why .s { display: inline-block; width: 1.4em; font-weight: 700; }
+.grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 0 26px; }
+@media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+.kv dt { color: var(--text-2); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.chartbox { position: relative; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); align-items: center; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.ranges button { padding: 2px 10px; font-size: 12px; }
+.ranges button.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15); display: none; white-space: nowrap; z-index: 5; }
+.tip b { font-variant-numeric: tabular-nums; }
+svg text { fill: var(--text-3); font-size: 11px; font-family: inherit; }
+.months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+@media (max-width: 800px) { .months { grid-template-columns: repeat(6, 1fr); } }
+.mcell { border: 1px solid var(--border); border-radius: 8px; padding: 5px 4px 6px; min-height: 64px; text-align: center; font-size: 11px; }
+.mcell.empty { opacity: .45; }
+.mcell .mm { color: var(--text-2); font-size: 12px; margin-bottom: 3px; }
+.tag { border-radius: 6px; padding: 2px 2px; margin-top: 3px; line-height: 1.35; }
+.tag b { display: block; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tag.rec { background: var(--mild-bg); color: var(--mild-fg); }
+.tag.pay { background: var(--good-bg); color: var(--good-fg); }
+.calc { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; background: var(--surface-2); border-radius: 10px; padding: 10px 14px; }
+.calc input { width: 120px; text-align: right; }
+.note { color: var(--text-3); font-size: 12px; margin-top: 16px; }
+footer { color: var(--text-3); font-size: 12px; margin-top: 14px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NISA 配当ウォッチ</h1>
+  <span class="sub">日経225 全銘柄+追加銘柄の配当一覧とエントリー目安</span>
+  <span class="sub" id="updated"></span>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <div class="toolbar">
+    <label>絞り込み <input id="q" placeholder="コード・銘柄名・業種" size="18"></label>
+    <label>利回り <select id="minY"><option value="0">すべて</option><option value="2">2%以上</option><option value="3">3%以上</option><option value="3.5">3.5%以上</option><option value="4">4%以上</option></select></label>
+    <label>目安 <select id="sig"><option value="">すべて</option><option value="1">押し目気味 以上</option><option value="2">買い場候補のみ</option></select></label>
+    <label>権利確定月 <select id="recM"><option value="0">すべて</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select></label>
+    <label>配当月 <select id="payM"><option value="0">すべて</option><option value="1">1月</option><option value="2">2月</option><option value="3">3月</option><option value="4">4月</option><option value="5">5月</option><option value="6">6月</option><option value="7">7月</option><option value="8">8月</option><option value="9">9月</option><option value="10">10月</option><option value="11">11月</option><option value="12">12月</option></select></label>
+    <span class="spacer"></span>
+    <label>銘柄を追加 <input id="addCode" placeholder="例: 8306" size="9"></label>
+    <button id="addBtn">追加</button>
+    <button id="syncBtn" title="日経225の構成銘柄(入れ替え)を取り込み直します。自分で追加した銘柄は残ります">日経225を再同期</button>
+    <button id="refreshBtn" class="primary">最新データに更新</button>
+  </div>
+  <div id="msg"></div>
+  <div class="tablewrap"><div class="loading" id="loading">日経225 全銘柄の株価・配当データを取得中です…(30秒〜1分ほどかかります)</div><table id="tbl" hidden><thead></thead><tbody></tbody></table></div>
+  <footer>
+    行をクリックすると、株価チャート・配当推移・エントリー目安の根拠・NISA枠での試算が開きます。列見出しクリックで並べ替え。<br>
+    権利確定月は直近1年の権利落ち日から、配当月(受取月)は権利確定の約3か月後として求めた目安です。<br>
+    配当利回り = 1株あたり年間配当(会社予想。無い場合は過去12ヶ月実績)÷ 現在株価。値動きの色は 日本式(<span class="up">赤 = 上昇</span> / <span class="down">緑 = 下落</span>)。<br>
+    「エントリー目安」は 利回りの5年平均比・52週レンジ内の位置・RSI・200日線乖離・配当性向 から機械的に点数化したものです。投資助言ではありません。データ元は Yahoo Finance で、遅延や誤りを含むことがあります(特に株式分割の前後)。購入前に必ず証券会社・企業の公式情報を確認してください。
+  </footer>
+</main>
+
+<dialog id="dlg"><div id="dlgIn"></div></dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let DATA = {rows: []}, sortKey = "yield", sortDir = -1;
+
+const fmt = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString("ja-JP", {minimumFractionDigits: d, maximumFractionDigits: d});
+const cur = r => r.currency === "JPY" ? "円" : " " + r.currency;
+const priceD = r => r.currency === "JPY" ? (r.price < 1000 && r.price % 1 ? 1 : 0) : 2;
+function pct(v, d = 1) {
+  if (v == null) return '<span class="muted">—</span>';
+  const c = v > 0 ? "up" : v < 0 ? "down" : "";
+  return `<span class="${c}">${v > 0 ? "▲ +" : v < 0 ? "▼ " : ""}${fmt(v, d)}%</span>`;
+}
+const SIG_ICON = {"2": "◎", "1": "○", "0": "–", "-1": "△"};
+const badge = s => `<span class="badge lv${s.level}">${SIG_ICON[s.level]} ${esc(s.label)}</span>`;
+function mcap(v) {
+  if (v == null) return "—";
+  return v >= 1e12 ? fmt(v / 1e12, 1) + "兆" : fmt(v / 1e8, 0) + "億";
+}
+function spark(vals) {
+  const v = (vals || []).filter(x => x != null);
+  if (v.length < 2) return "";
+  const w = 96, h = 26, mn = Math.min(...v), mx = Math.max(...v), rg = mx - mn || 1;
+  const pts = v.map((y, i) => `${(i / (v.length - 1) * w).toFixed(1)},${(h - 2 - (y - mn) / rg * (h - 4)).toFixed(1)}`).join(" ");
+  return `<svg class="spark" width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="var(--text-2)" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+const COLS = [
+  {k: "code", t: "コード", cls: "l", f: r => `<b>${esc(r.code)}</b>`},
+  {k: "name", t: "銘柄名", cls: "l name", f: r => `${esc(r.name)}<small>${esc(r.sector)}</small>`},
+  {k: "price", t: "現在値", f: r => fmt(r.price, priceD(r)) + `<span class="muted">${cur(r)}</span>`},
+  {k: "chg_1d", t: "前日比", f: r => pct(r.chg_1d, 2)},
+  {k: "chg_1y", t: "1年変動", f: r => pct(r.chg_1y)},
+  {k: "chg_3y", t: "3年変動", f: r => pct(r.chg_3y)},
+  {k: null, t: "3年の値動き", cls: "c", f: r => spark(r.spark)},
+  {k: "yield", t: "配当利回り", f: r => r.yield == null ? "—" : `<span class="yield ${r.yield_suspect ? "muted" : ""}">${fmt(r.yield, 2)}%</span>` + (r.div_warn ? ` <span class="warnmark" title="${esc(r.div_warn)}">⚠</span>` : "")},
+  {k: "div_rate", t: "1株配当(年)", f: r => r.div_rate == null ? "—" : `${fmt(r.div_rate, r.div_rate % 1 ? 1 : 0)}<span class="muted">${cur(r)} ${r.div_kind}</span>`},
+  {k: "record_months", t: "権利確定月", cls: "c", f: r => months(r.record_months)},
+  {k: "pay_months", t: "配当月(目安)", cls: "c", f: r => months(r.pay_months)},
+  {k: "score", t: "エントリー目安", cls: "c", f: r => badge(r.signal)},
+  {k: "yield_5y_avg", t: "5年平均利回り", f: r => r.yield_5y_avg == null ? "—" : fmt(r.yield_5y_avg, 2) + "%"},
+  {k: "payout", t: "配当性向", f: r => r.payout == null ? "—" : `<span class="${r.payout > 100 ? "warnmark" : ""}">${fmt(r.payout, 0)}%</span>`},
+  {k: "per", t: "PER", f: r => fmt(r.per, 1)},
+  {k: "pbr", t: "PBR", f: r => fmt(r.pbr, 2)},
+  {k: "pos52", t: "52週レンジ内の位置", cls: "l", f: r => r.pos52 == null ? "—" : `<span class="meter" title="安値 ${fmt(r.lo52)} 〜 高値 ${fmt(r.hi52)}"><i style="left:${r.pos52}%"></i></span>${r.pos52}%`},
+  {k: "rsi", t: "RSI", f: r => fmt(r.rsi, 0)},
+  {k: null, t: "", f: r => `<button class="del" data-del="${esc(r.code)}" title="一覧から削除">✕</button>`},
+];
+const months = a => a && a.length ? a.join("・") + "月" : '<span class="muted">—</span>';
+const sortVal = (r, k) => (k === "record_months" || k === "pay_months") ? ((r[k] || [])[0] ?? null) : k === "score" ? r.signal.score : (k === "yield" && r.yield_suspect) ? null : r[k];
+
+function render() {
+  const q = $("#q").value.trim().toLowerCase(), minY = +$("#minY").value, sig = $("#sig").value;
+  const rm = +$("#recM").value, pm = +$("#payM").value;
+  let rows = DATA.rows.filter(r =>
+    (!q || (r.code + r.name + r.sector).toLowerCase().includes(q)) &&
+    (!minY || (r.yield || 0) >= minY) && (!sig || r.signal.level >= +sig) && (!rm || (r.record_months || []).includes(rm)) && (!pm || (r.pay_months || []).includes(pm)));
+  rows.sort((a, b) => {
+    const x = sortVal(a, sortKey), y = sortVal(b, sortKey);
+    if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y, "ja") : x - y) * sortDir;
+  });
+  $("#tbl thead").innerHTML = "<tr>" + COLS.map(c =>
+    `<th class="${c.cls || ""} ${c.k === sortKey ? "sorted" : ""}" data-k="${c.k || ""}">${c.t}${c.k === sortKey ? (sortDir > 0 ? " ↑" : " ↓") : ""}</th>`).join("") + "</tr>";
+  $("#tbl tbody").innerHTML = rows.map(r =>
+    `<tr data-code="${esc(r.code)}">` + COLS.map(c => `<td class="num ${c.cls || ""}">${c.f(r)}</td>`).join("") + "</tr>").join("")
+    || `<tr><td colspan="${COLS.length}" class="c muted">条件に合う銘柄がありません</td></tr>`;
+
+  const ok = DATA.rows.filter(r => r.yield != null && !r.yield_suspect);
+  const avg = ok.length ? ok.reduce((s, r) => s + r.yield, 0) / ok.length : null;
+  const top = ok.slice().sort((a, b) => b.yield - a.yield)[0];
+  const buy = DATA.rows.filter(r => r.signal.level === 2), dip = DATA.rows.filter(r => r.signal.level === 1);
+  $("#tiles").innerHTML = [
+    ["登録銘柄", DATA.rows.length + " 銘柄", "日経225 + 追加銘柄 ・ 配当あり " + ok.length],
+    ["平均 配当利回り", avg == null ? "—" : fmt(avg, 2) + "%", "登録銘柄の単純平均"],
+    ["最高利回り", top ? fmt(top.yield, 2) + "%" : "—", top ? esc(top.code + " " + top.name) : ""],
+    ["◎ 買い場候補", buy.length + " 銘柄", esc(buy.map(r => r.name).slice(0, 3).join("、")) + (buy.length > 3 ? " ほか" : "")],
+    ["○ 押し目気味", dip.length + " 銘柄", esc(dip.map(r => r.name).slice(0, 3).join("、")) + (dip.length > 3 ? " ほか" : "")],
+  ].map(([k, v, n]) => `<div class="tile"><div class="k">${k}</div><div class="v num">${v}</div><div class="n">${n}</div></div>`).join("");
+  $("#updated").textContent = DATA.fetched_at ? "取得: " + DATA.fetched_at : "";
+}
+
+let pollTimer = null;
+function setData(d) {
+  DATA = d;
+  const has = d.rows.length > 0;
+  $("#loading").hidden = has; $("#tbl").hidden = !has;
+  const notes = [];
+  if (d.sync_note) notes.push(d.sync_note);
+  if (d.error) notes.push(d.error);
+  if (d.refreshing && has) notes.push("最新データを取得中です…(完了すると自動で表示が切り替わります)");
+  if (!d.refreshing && d.failed && d.failed.length) notes.push("取得できなかった銘柄: " + d.failed.join(", "));
+  $("#msg").textContent = notes.join(" / ");
+  if (!has && d.error) $("#loading").textContent = d.error;
+  const b = $("#refreshBtn"); b.disabled = d.refreshing; b.textContent = d.refreshing ? "取得中…" : "最新データに更新";
+  $("#syncBtn").disabled = d.refreshing;
+  render();
+  clearTimeout(pollTimer);
+  if (d.refreshing) pollTimer = setTimeout(() => load(false), 3000);   // 裏の取得が終わるまで定期的に確認
+}
+async function api(url, opt) {
+  const r = await fetch(url, opt), j = await r.json().catch(() => ({error: "サーバーの応答を読めませんでした"}));
+  if (!r.ok) throw new Error(j.error || "エラーが発生しました");
+  return j;
+}
+async function load(refresh) {
+  try { setData(await api("/api/data" + (refresh ? "?refresh=1" : ""))); }
+  catch (e) { $("#loading").textContent = "サーバーに接続できません。commandファイルから起動し直してください。"; $("#msg").textContent = e.message; }
+}
+$("#syncBtn").onclick = async () => {
+  if (!confirm("日経225の構成銘柄を取り込み直して、全銘柄のデータを再取得しますか?")) return;
+  try { setData(await api("/api/sync225", {method: "POST"})); } catch (e) { $("#msg").textContent = e.message; }
+};
+$("#refreshBtn").onclick = () => load(true);
+["recM", "payM", "q", "minY", "sig"].forEach(id => $("#" + id).addEventListener("input", render));
+$("#tbl thead").onclick = e => {
+  const k = e.target.closest("th")?.dataset.k; if (!k) return;
+  if (k === sortKey) sortDir = -sortDir; else { sortKey = k; sortDir = ["code", "name", "record_months", "pay_months"].includes(k) ? 1 : -1; }
+  render();
+};
+$("#tbl tbody").onclick = async e => {
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    e.stopPropagation();
+    if (confirm(del.dataset.del + " を一覧から削除しますか?")) setData(await api("/api/watchlist/" + encodeURIComponent(del.dataset.del), {method: "DELETE"}));
+    return;
+  }
+  const code = e.target.closest("tr")?.dataset.code; if (code) openDetail(code);
+};
+async function addCode() {
+  const code = $("#addCode").value.trim(); if (!code) return;
+  const b = $("#addBtn"); b.disabled = true; b.textContent = "取得中…"; $("#msg").textContent = "";
+  try { setData(await api("/api/watchlist", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({code})})); $("#addCode").value = ""; }
+  catch (e) { $("#msg").textContent = e.message; }
+  b.disabled = false; b.textContent = "追加";
+}
+$("#addBtn").onclick = addCode;
+$("#addCode").onkeydown = e => { if (e.key === "Enter") addCode(); };
+
+/* ───────── 詳細ダイアログ ───────── */
+let DET = null, ROW = null, RANGE = 3;
+async function openDetail(code) {
+  ROW = DATA.rows.find(r => r.code === code);
+  try { DET = await api("/api/detail/" + encodeURIComponent(code)); } catch (e) { $("#msg").textContent = e.message; return; }
+  const r = ROW, c = cur(r), s = r.signal;
+  const signCls = {"+": "plus", "-": "minus", "!": "warnmark"};
+  $("#dlgIn").innerHTML = `
+  <div class="dhead">
+    <div style="flex:1"><h2>${esc(r.code)} ${esc(r.name)}</h2><span class="sub">${esc(r.sector)} ・ 時価総額 ${mcap(r.mcap)}${r.currency === "JPY" ? "円" : ""} ・ ${esc(r.last_date)} 時点</span></div>
+    <div style="text-align:right"><div class="price num">${fmt(r.price, priceD(r))}${c}</div><div class="num">${pct(r.chg_1d, 2)} <span class="muted">(${r.chg_1d_abs > 0 ? "+" : ""}${fmt(r.chg_1d_abs, priceD(r))})</span></div></div>
+    <button onclick="dlg.close()">閉じる</button>
+  </div>
+  <div class="dbody">
+    <div class="tiles">
+      <div class="tile"><div class="k">配当利回り(${r.div_kind || "—"})</div><div class="v num">${r.yield == null ? "—" : fmt(r.yield, 2) + "%"}</div><div class="n">5年平均 ${r.yield_5y_avg == null ? "—" : fmt(r.yield_5y_avg, 2) + "%"}</div></div>
+      <div class="tile"><div class="k">最低購入額(${r.lot}株)</div><div class="v num">${fmt(r.lot_cost)}${c}</div><div class="n">1株配当 ${fmt(r.div_rate, 1)}${c}/年</div></div>
+      <div class="tile"><div class="k">${r.lot}株の年間配当</div><div class="v num">${fmt(r.lot_div)}${c}</div><div class="n">NISA口座なら国内課税なし</div></div>
+      <div class="tile"><div class="k">エントリー目安(スコア ${s.score > 0 ? "+" : ""}${s.score})</div><div class="v">${badge(s)}</div><div class="n">機械的な判定です</div></div>
+    </div>
+    <h3>エントリー目安の根拠</h3>
+    <ul class="why">${s.why.length ? s.why.map(([m, t]) => `<li><span class="s ${signCls[m]}">${m === "+" ? "＋" : m === "-" ? "－" : "⚠"}</span>${esc(t)}</li>`).join("") : '<li class="muted">特に目立つ材料はありません(割安でも割高でもない水準)</li>'}</ul>
+    <div class="note" style="margin-top:4px">＋ = 買いやすい材料 / － = 待ちたい材料 / ⚠ = 注意点</div>
+
+    <h3>配当スケジュール(権利確定月と受取月)</h3>
+    ${schedule(r)}
+
+    <h3>株価の推移</h3>
+    <div class="legend">
+      <span class="ranges" id="ranges">${[[0.5, "6ヶ月"], [1, "1年"], [3, "3年"], [5, "5年"], [10, "10年"]].map(([v, t]) => `<button data-r="${v}">${t}</button>`).join(" ")}</span>
+      <span><i style="background:var(--s1)"></i>終値</span><span><i style="background:var(--s2)"></i>75日移動平均</span><span><i style="background:var(--s3)"></i>200日移動平均</span>
+      <span id="rangeChg" class="num"></span>
+    </div>
+    <div class="chartbox" id="priceChart"></div>
+
+    <div class="grid2">
+      <div><h3>年間配当の推移(1株あたり・権利落ち日の暦年ベース)</h3><div class="chartbox" id="divChart"></div>
+        <div class="note" style="margin-top:2px">減配なし継続: ${r.div_no_cut_years}年 ・ 直近3年の配当成長率: ${r.div_cagr3 == null ? "—" : fmt(r.div_cagr3, 1) + "%/年"} ・ 斜線の年は途中経過</div></div>
+      <div><h3>指標</h3><dl class="kv">
+        <dt>1年変動 / 3年変動</dt><dd>${pct(r.chg_1y)} / ${pct(r.chg_3y)}</dd>
+        <dt>3年リターン(配当込み)</dt><dd>${pct(r.total_3y)}</dd>
+        <dt>3年高値からの下落率</dt><dd>${pct(r.from_hi3y)}</dd>
+        <dt>52週 安値 〜 高値</dt><dd>${fmt(r.lo52, priceD(r))} 〜 ${fmt(r.hi52, priceD(r))}</dd>
+        <dt>移動平均乖離 25日 / 75日 / 200日</dt><dd>${pct(r.dev25)} / ${pct(r.dev75)} / ${pct(r.dev200)}</dd>
+        <dt>RSI(14日)</dt><dd>${fmt(r.rsi, 1)}</dd>
+        <dt>配当性向</dt><dd>${r.payout == null ? "—" : fmt(r.payout, 1) + "%"}</dd>
+        <dt>PER / PBR</dt><dd>${fmt(r.per, 1)}倍 / ${fmt(r.pbr, 2)}倍</dd>
+        <dt>権利落ち日(直近・予定)</dt><dd>${esc(r.ex_date || "—")}</dd>
+      </dl></div>
+    </div>
+
+    <h3>NISA 試算</h3>
+    <div class="calc">
+      <label>投資額 <input id="budget" type="number" step="10000" value="${Math.min(DATA.nisa_limit, Math.max(r.lot_cost, 1000000))}"> ${c.trim()}</label>
+      <span id="calcOut" class="num"></span>
+    </div>
+    <div class="note">成長投資枠の年間上限は ${fmt(DATA.nisa_limit)}円。${r.lot > 1 ? r.lot + "株単位で計算。" : ""}配当額は現在の年間配当が続いた場合の目安です。${r.currency !== "JPY" ? "外国株の配当は現地で源泉徴収されます。" : ""}</div>
+  </div>`;
+  $("#ranges").onclick = e => { const v = e.target.dataset.r; if (v) { RANGE = +v; drawPrice(); } };
+  $("#budget").oninput = calc;
+  $("#dlg").showModal(); $("#dlg").scrollTop = 0;
+  drawPrice(); drawDiv(); calc();
+}
+function schedule(r) {
+  const dm = r.div_months || [];
+  if (!dm.length) return '<div class="muted">直近1年に配当の記録がありません</div>';
+  const c = cur(r), amt = d => fmt(d.amount, d.amount % 1 ? 1 : 0) + c;
+  let cells = "";
+  for (let m = 1; m <= 12; m++) {
+    const rec = dm.filter(d => d.m === m), pay = dm.filter(d => d.pay === m);
+    cells += `<div class="mcell ${rec.length || pay.length ? "" : "empty"}"><div class="mm">${m}月</div>`
+      + rec.map(d => `<div class="tag rec" title="直近の権利落ち日: ${esc(d.ex)}">権利確定<b>${amt(d)}</b></div>`).join("")
+      + pay.map(d => `<div class="tag pay" title="${d.m}月 権利確定分">受取(目安)<b>${amt(d)}</b></div>`).join("") + "</div>";
+  }
+  return `<div class="months">${cells}</div>
+    <div class="note" style="margin-top:6px">金額は直近1年の実績(1株あたり)。権利確定月の「権利付最終日」までに買うと、その回の配当を受け取れます。${esc(r.ex_date ? "次回の権利落ち日(予定): " + r.ex_date + "。" : "")}<br>
+    受取月は目安です(${r.currency !== "JPY" ? "権利落ち日の約2週間後" : r.lot === 1 ? "権利確定の約1か月後" : "権利確定の約3か月後。中間配当は1か月ほど早い会社もあります"})。正確な支払日は各社の発表を確認してください。</div>`;
+}
+function calc() {
+  const r = ROW, b = +$("#budget").value || 0, c = cur(r);
+  const n = Math.floor(b / (r.price * r.lot)) * r.lot;
+  $("#calcOut").innerHTML = n ? `→ <b>${fmt(n)}株</b>(${fmt(n * r.price)}${c})購入で 年間配当 <b>約 ${fmt(n * (r.div_rate || 0))}${c}</b>、10年保有で 約 ${fmt(n * (r.div_rate || 0) * 10)}${c}`
+    : `→ 最低購入額 ${fmt(r.lot_cost)}${c} に届きません`;
+}
+$("#dlg").addEventListener("click", e => { if (e.target === $("#dlg")) $("#dlg").close(); });
+
+function niceTicks(mn, mx, n = 5) {
+  const raw = (mx - mn) / n || 1, mag = 10 ** Math.floor(Math.log10(raw)), f = raw / mag;
+  const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(mn / step) * step; v <= mx + step * 1e-6; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+function drawPrice() {
+  document.querySelectorAll("#ranges button").forEach(b => b.classList.toggle("on", +b.dataset.r === RANGE));
+  const box = $("#priceChart"), N = DET.dates.length;
+  const last = new Date(DET.dates[N - 1]), from = new Date(last); from.setMonth(from.getMonth() - RANGE * 12);
+  let i0 = DET.dates.findIndex(d => new Date(d) >= from); if (i0 < 0) i0 = 0;
+  const dates = DET.dates.slice(i0), S = [["終値", "--s1", DET.close.slice(i0), 2], ["75日線", "--s2", DET.ma75.slice(i0), 1.5], ["200日線", "--s3", DET.ma200.slice(i0), 1.5]];
+  const n = dates.length, W = box.clientWidth || 900, H = 300, L = 8, R = 58, T = 10, B = 24;
+  const all = S.flatMap(s => s[2]).filter(v => v != null);
+  let mn = Math.min(...all), mx = Math.max(...all); const pad = (mx - mn) * 0.06 || 1; mn -= pad; mx += pad;
+  const X = i => L + i / Math.max(n - 1, 1) * (W - L - R), Y = v => T + (mx - v) / (mx - mn) * (H - T - B);
+  let g = "";
+  niceTicks(mn, mx).forEach(v => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--border)" stroke-width="1"/><text x="${W - R + 6}" y="${Y(v) + 4}">${fmt(v)}</text>`; });
+  let prev = "", lastX = -99;
+  dates.forEach((d, i) => {
+    const key = RANGE <= 1 ? d.slice(0, 7) : d.slice(0, 4);
+    if (key !== prev && i > 0 && X(i) - lastX > 46) { g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${RANGE <= 1 ? d.slice(2, 7).replace("-", "/") : key}</text>`; lastX = X(i); }
+    prev = key;
+  });
+  S.slice().reverse().forEach(([, col, vals, w]) => {
+    let p = "", pen = false;
+    vals.forEach((v, i) => { if (v == null) { pen = false; return; } p += (pen ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); pen = true; });
+    g += `<path d="${p}" fill="none" stroke="var(${col})" stroke-width="${w}" stroke-linejoin="round"/>`;
+  });
+  box.innerHTML = `<svg width="${W}" height="${H}">${g}<line id="xh" y1="${T}" y2="${H - B}" stroke="var(--text-3)" stroke-width="1" visibility="hidden"/><circle id="xd" r="4" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/></svg><div class="tip"></div>`;
+  const c0 = S[0][2][0], c1 = S[0][2][n - 1];
+  $("#rangeChg").innerHTML = "この期間の変動: " + pct((c1 / c0 - 1) * 100);
+  const tip = box.querySelector(".tip"), xh = box.querySelector("#xh"), xd = box.querySelector("#xd"), hit = box.querySelector("#hit");
+  hit.onmousemove = e => {
+    const rc = box.getBoundingClientRect(), mxp = e.clientX - rc.left;
+    const i = Math.max(0, Math.min(n - 1, Math.round((mxp - L) / (W - L - R) * (n - 1))));
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("visibility", "visible");
+    xd.setAttribute("cx", X(i)); xd.setAttribute("cy", Y(S[0][2][i])); xd.setAttribute("visibility", "visible");
+    tip.innerHTML = `<div class="muted">${dates[i]}</div>` + S.map(([nm, col, v]) => `<div><i style="display:inline-block;width:10px;height:3px;background:var(${col});vertical-align:middle;margin-right:6px"></i>${nm} <b>${fmt(v[i], 1)}</b></div>`).join("");
+    tip.style.display = "block";
+    const tw = tip.offsetWidth; tip.style.left = (X(i) + 14 + tw > W - R ? X(i) - tw - 14 : X(i) + 14) + "px"; tip.style.top = "14px";
+  };
+  hit.onmouseleave = () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); xd.setAttribute("visibility", "hidden"); };
+}
+function drawDiv() {
+  const box = $("#divChart"), D = DET.div_years.slice(-10), W = box.clientWidth || 560, H = 200, L = 8, R = 8, T = 22, B = 24;
+  if (!D.length) { box.innerHTML = '<div class="muted">配当の記録がありません</div>'; return; }
+  const mx = Math.max(...D.map(d => d.div)) || 1, bw = (W - L - R) / D.length, w = Math.min(bw - 2, 44);
+  const Y = v => T + (1 - v / mx) * (H - T - B);
+  let g = `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--s1)" opacity=".35"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--s1)" stroke-width="3"/></pattern></defs>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--border)"/>`;
+  D.forEach((d, i) => {
+    const x = L + i * bw + (bw - w) / 2, y = Y(d.div), h = Math.max(H - B - y, 1), r = Math.min(4, h);
+    g += `<path d="M${x} ${H - B}V${y + r}q0 ${-r} ${r} ${-r}h${w - 2 * r}q${r} 0 ${r} ${r}V${H - B}z" fill="${d.partial ? "url(#hatch)" : "var(--s1)"}"><title>${d.year}年${d.partial ? "(途中)" : ""}: ${fmt(d.div, 1)}</title></path>`;
+    g += `<text x="${x + w / 2}" y="${y - 5}" text-anchor="middle" style="fill:var(--text-2)">${fmt(d.div, d.div % 1 ? 1 : 0)}</text>`;
+    g += `<text x="${x + w / 2}" y="${H - 7}" text-anchor="middle">${D.length > 7 ? "'" + String(d.year).slice(2) : d.year}</text>`;
+  });
+  box.innerHTML = `<svg width="${W}" height="${H}">${g}</svg>`;
+}
+window.addEventListener("resize", () => { if ($("#dlg").open) { drawPrice(); drawDiv(); } });
+load(false);
+</script>
+</body>
+</html>
